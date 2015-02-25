@@ -39,42 +39,23 @@ while(T) {
   phi <- apply(p.z, c(2, 3, 4), sum) + .5
 }
 
-# saveRDS(list(theta=theta, phi=phi), "sol5.rds")
+saveRDS(list(K=K, llh=llh, theta=theta, phi=phi), "sol5b.rds")
 
 comp.names <- paste("C", 1:K, sep="")
-comp.names <- c("C.nat", "C.kons", "C.vihr", "C.vas", "C.kok")
+comp.names <- c("C.republ", "C.perint", "C.demvihr", "C.vas", "C.oik")
 pol <- cbind(d %>% select(name, party, district), theta %>% data.frame %>% setNames(comp.names))
 
-for (cname in comp.names) {
-  cat("\nComp ", cname, "\n")
-  print(pol %>% arrange_(paste("-", cname, sep="")) %>% select_("name", "party", cname) %>% head(20))
+if (F) {
+  for (cname in comp.names) {
+    cat("\nComp ", cname, "\n")
+    print(pol %>% arrange_(paste("-", cname, sep="")) %>% select_("name", "party", cname) %>% head(20))
+  }
+  
+  hist(p.v, n=100)
+  heatmap(theta)
 }
 
-hist(p.v, n=100)
-heatmap(theta)
 
-big1 <- c("Keskusta", "SDP", "Perussuomalaiset")
-big2 <- c("Kokoomus", "Vihreät")
-
-
-pol %>% group_by(party) %>% 
-  summarise_each(funs(mean), matches("^C")) %>% gather(comp, p, -party) %>% 
-  ggplot(aes(x=comp, y=party, fill=p)) + geom_tile()
-pol %>% filter(district != "default") %>% group_by(district) %>% 
-  summarise_each(funs(mean), matches("^C")) %>% gather(comp, p, -district) %>% 
-  ggplot(aes(x=comp, y=district, fill=p)) + geom_tile()
-
-pol %>% filter(district=="Uusimaa" & party %in% big1) %>% 
-  mutate(name2=paste(substr(party, 1, 4), name)) %>%
-  arrange(party) %>% select(name2, matches("^C")) %>%
-  gather(comp, p, -name2) %>% 
-  ggplot(aes(x=comp, y=name2, fill=p)) + geom_tile()
-
-pol %>% filter(district=="Uusimaa" & party %in% big2) %>% 
-  mutate(name2=paste(substr(party, 1, 4), name)) %>%
-  arrange(party) %>% select(name2, matches("^C")) %>%
-  gather(comp, p, -name2) %>% 
-  ggplot(aes(x=comp, y=name2, fill=p)) + geom_tile()
 
 party.plot <- function(prty) {
   pol %>% filter(district %in% c("Uusimaa", "Helsinki") & party==prty) %>% 
@@ -88,7 +69,42 @@ party.plot <- function(prty) {
 }
 
 pdf("Hki-Uusimaa-partyplots.pdf")
-c("Keskusta", "Kokoomus", "Perussuomalaiset", "SDP", "Vihreät", "Vasemmistoliitto", 
-         "Kristillisdemokraatit", "Piraattipuolue", "RKP") %>% 
+names(sort(table(d$party), decr=T)) %>% 
   sapply(., function (i) print(party.plot(i)))
+#dev.off()
+
+#pdf("Comp-response-plots.pdf")
+(function (k) 
+  phi[k,,] %>% data.frame(q=rownames(.), .) %>% gather(reply, p, -q) %>%
+   cbind(comp=comp.names[k], .)) %>%
+  sapply(1:K, ., simplify=F) %>%
+  rbind_all %>%
+  ggplot(aes(x=reply, y=q, fill=p)) + geom_tile() + 
+     scale_fill_gradientn(colours = rev(brewer.pal(9, "YlGnBu"))) + 
+     labs(x="", y="") + scale_x_discrete(expand = c(0, 0)) + 
+     scale_y_discrete(expand = c(0, 0)) + theme(axis.ticks = element_blank(), legend.position="none") +
+  facet_grid(~ comp) + 
+  ggtitle("Responses of components")
+#dev.off()
+
+pol %>% group_by(party) %>% 
+  summarise_each(funs(mean), matches("^C")) %>% gather(comp, p, -party) %>% 
+  ggplot(aes(x=comp, y=party, fill=p)) + geom_tile() +
+  scale_fill_gradientn(colours = rev(brewer.pal(9, "YlGnBu"))) + 
+  theme_bw(14) +
+  labs(x="", y="") + scale_x_discrete(expand = c(0, 0)) + 
+  scale_y_discrete(expand = c(0, 0)) + theme(axis.ticks = element_blank()) +
+  ggtitle("By party (whole country)")
+
+pol %>% filter(district != "default") %>% group_by(district) %>% 
+  summarise_each(funs(mean), matches("^C")) %>% gather(comp, p, -district) %>% 
+  ggplot(aes(x=comp, y=district, fill=p)) + geom_tile() +
+  scale_fill_gradientn(colours = rev(brewer.pal(9, "YlGnBu"))) + 
+  theme_bw(14) +
+  labs(x="", y="") + scale_x_discrete(expand = c(0, 0)) + 
+  scale_y_discrete(expand = c(0, 0)) + theme(axis.ticks = element_blank()) +
+  ggtitle("By disctrict")
+
 dev.off()
+
+
